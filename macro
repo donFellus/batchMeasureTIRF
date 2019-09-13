@@ -1,19 +1,12 @@
 // Select input directory, reference file and output directory
-dir=getDirectory("Choose a Input Directory"); 
+dir=getDirectory("Choose an Input Directory"); 
 print(dir); 
-file = File.openDialog("select a file");
+file = File.openDialog("Select reference file");
 setBatchMode(false);
-dirOut = getDirectory("Choose a Output Directory");
+dirOut = getDirectory("Choose an Output Directory");
 
 list = getFileList(dir);
 Array.print(list);
-
-// Select a reference file to denote the channel names. The 
-// SIRC channel must be called SIRC, while the other channels 
-// have no restrictions
-
-
-//file = dir + list[0];
 
 run("Bio-Formats Importer", "open=[file]");
 
@@ -28,9 +21,6 @@ for (c=0; c < nC; c++) {
 //	Channels = newArray();
 }
 Dialog.show();
-// Channels = Dialog.getString("Channels");
-
-//print(Channels);
 
 close();
 
@@ -39,10 +29,6 @@ for (c=0; c < nC; c++) {
 }
 
 Array.print(Channels);
-//ChArray = newArray(c1, c2, c3, c4);
-//Array.print(ChArray)
-
-//print(Ch5);
 
 sortCh(dir);
 
