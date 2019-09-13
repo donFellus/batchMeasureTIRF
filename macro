@@ -1,9 +1,31 @@
-// Select input directory, reference file and output directory
-dir=getDirectory("Choose an Input Directory"); 
+// This macro is designed to automatically segment, subtract 
+// the background and measure standard parameters (based on 
+// the Analyze -> Set Measurements settings in ImageJ) from 
+// .vsi files aqcuired at the Olympus TIRF, and store the 
+// images as tiff files in subfolders in a destination folder.
+
+// The macro first prompts you to select the parent folder 
+// of the raw TIRF data. Then you are prompted to select
+// a reference file from the raw data to denote the various 
+// channels. Finally you are prompted to select a parent 
+// output folder in which you want to save the segmented 
+// TIFF files.
+//
+// The reference file will then automatically open along with
+// a dialog box. Fill in the channel names in the correct order
+// (according to the reference file). Choose which channel to 
+// use for outlining the cells. The macro will then analyse and 
+// save the images accordingly.
+
+// Written by Audun Kvalvaag. Last modified
+// 04.09.2019.
+
+// Select input and output directories
+dir=getDirectory("Choose a Input Directory"); 
 print(dir); 
-file = File.openDialog("Select reference file");
+file = File.openDialog("select a file");
 setBatchMode(false);
-dirOut = getDirectory("Choose an Output Directory");
+dirOut = getDirectory("Choose a Output Directory");
 
 list = getFileList(dir);
 Array.print(list);
@@ -18,7 +40,6 @@ Array.print(Channels);
 Dialog.create("Channels")
 for (c=0; c < nC; c++) {
 	Dialog.addString("Ch" + c, " ");
-//	Channels = newArray();
 }
 Dialog.show();
 
@@ -30,16 +51,24 @@ for (c=0; c < nC; c++) {
 
 Array.print(Channels);
 
+// Select raw data file type
+Dialog.create("Filetype")
+Dialog.addString("Filetype", " ");
+Dialog.show();
+Filetype = Dialog.getString();
+
+// Select mask channel
+Dialog.create("Mask Channel")
+Dialog.addString("Mask Channel", " ");
+Dialog.show();
+maskCh = Dialog.getString();
+
 sortCh(dir);
 
 function sortCh(dir) {
 	for (i = 0; i < list.length; i++) {
-		if (endsWith(list[i], ".vsi")) {
+		if (endsWith(list[i], "." + Filetype)) {
 			file = dir+list[i];
-//			files = getFileList(folder);
-//			Array.print(file);
-//			Array.reverse(files);
-//			file = folder + files[0];
 			run("Bio-Formats Importer", "open=[file]");
 			Img = dirOut + File.separator + list[i]; 
 			print(Img); 
@@ -50,14 +79,13 @@ function sortCh(dir) {
 				selectWindow(ImgArray[s]);
 				rename(Channels[s]); 
 				}
-			selectWindow("SIRC");
-			saveAs("Tiff", Img + File.separator + "SIRC");
+			selectWindow(maskCh);
+			saveAs("Tiff", Img + File.separator + maskCh);
 			run("Subtract Background...", "rolling=100 light");
 			run("Enhance Contrast...", "saturated=0.3 normalize");
 			run("Add...", "value=5000");
 			run("Make Binary");
 			run("Fill Holes");
-			//run("Watershed");
 			run("Analyze Particles...", "size=7-Infinity exclude add");
 			saveAs("Tiff", Img + File.separator + "masks");
 			close;
