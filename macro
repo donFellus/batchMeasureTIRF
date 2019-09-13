@@ -1,0 +1,93 @@
+// Select input directory, reference file and output directory
+dir=getDirectory("Choose a Input Directory"); 
+print(dir); 
+file = File.openDialog("select a file");
+setBatchMode(false);
+dirOut = getDirectory("Choose a Output Directory");
+
+list = getFileList(dir);
+Array.print(list);
+
+// Select a reference file to denote the channel names. The 
+// SIRC channel must be called SIRC, while the other channels 
+// have no restrictions
+
+
+//file = dir + list[0];
+
+run("Bio-Formats Importer", "open=[file]");
+
+nC = nSlices();
+print(nC);
+Channels = newArray(nC);
+Array.print(Channels);
+
+Dialog.create("Channels")
+for (c=0; c < nC; c++) {
+	Dialog.addString("Ch" + c, " ");
+//	Channels = newArray();
+}
+Dialog.show();
+// Channels = Dialog.getString("Channels");
+
+//print(Channels);
+
+close();
+
+for (c=0; c < nC; c++) {
+	Channels[c] = Dialog.getString();
+}
+
+Array.print(Channels);
+//ChArray = newArray(c1, c2, c3, c4);
+//Array.print(ChArray)
+
+//print(Ch5);
+
+sortCh(dir);
+
+function sortCh(dir) {
+	for (i = 0; i < list.length; i++) {
+		if (endsWith(list[i], ".vsi")) {
+			file = dir+list[i];
+//			files = getFileList(folder);
+//			Array.print(file);
+//			Array.reverse(files);
+//			file = folder + files[0];
+			run("Bio-Formats Importer", "open=[file]");
+			Img = dirOut + File.separator + list[i]; 
+			print(Img); 
+			File.makeDirectory(Img);
+			run("Split Channels");
+			ImgArray = getList("image.titles");
+			for (s = 0; s < nC; s++) {
+				selectWindow(ImgArray[s]);
+				rename(Channels[s]); 
+				}
+			selectWindow("SIRC");
+			saveAs("Tiff", Img + File.separator + "SIRC");
+			run("Subtract Background...", "rolling=100 light");
+			run("Enhance Contrast...", "saturated=0.3 normalize");
+			run("Add...", "value=5000");
+			run("Make Binary");
+			run("Fill Holes");
+			//run("Watershed");
+			run("Analyze Particles...", "size=7-Infinity exclude add");
+			saveAs("Tiff", Img + File.separator + "masks");
+			close;
+			n = nImages;
+			print(n);
+			for (m = 0; m < n; m++) {
+				run("Subtract Background...", "rolling=50");
+				ImgName = getTitle();
+				saveAs("Tiff", Img + File.separator + ImgName);
+				roiManager("measure");
+				close;
+			}
+			roiManager("deselect");
+			roiManager("delete");
+		}
+	}
+	selectWindow("Results");
+	saveAs("Results.txt", dirOut + File.separator + "ResultsAll");
+}
