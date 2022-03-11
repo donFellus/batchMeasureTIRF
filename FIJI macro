@@ -1,36 +1,56 @@
 // This macro is designed to automatically segment, subtract 
-// the background and measure standard parameters (based on 
-// the Analyze -> Set Measurements settings in ImageJ) from 
-// .vsi files aqcuired at the Olympus TIRF, and store the 
-// images as tiff files in subfolders in a destination folder.
+// the background and measure standard parameters from 2D 
+// micrographs of the immunological synapse based on a  
+// brightfield (BF) image.
 
 // The macro first prompts you to select the parent folder 
-// of the raw TIRF data. Then you are prompted to select
+// of the raw microgaphs. Then you are prompted to select
 // a reference file from the raw data to denote the various 
-// channels. Finally you are prompted to select a parent 
-// output folder in which you want to save the segmented 
-// TIFF files.
+// channels. Finally you are prompted to select an output
+// folder in which you want to save the segmented TIFF files.
 //
 // The reference file will then automatically open along with
 // a dialog box. Fill in the channel names in the correct order
-// (according to the reference file). Choose which channel to 
-// use for outlining the cells. The macro will then analyse and 
-// save the images accordingly.
+// (according to the reference file). The BF channel must 
+// be denoted BF. The rest of the channels you are free to 
+// call whatever you want. The macro will then analyse and save
+// the images accordingly.
 
 // Written by Audun Kvalvaag. Last modified
 // 04.09.2019.
 
 // Select input and output directories
 dir=getDirectory("Choose a Input Directory"); 
-print(dir); 
-file = File.openDialog("select a file");
+print(dir);
 setBatchMode(false);
 dirOut = getDirectory("Choose a Output Directory");
 
-list = getFileList(dir);
-Array.print(list);
+subfolders = getFileList(dir);
+Array.print(subfolders);
 
-run("Bio-Formats Importer", "open=[file]");
+folder = dir+subfolders[0];
+files = getFileList(folder);
+Array.print(files);
+
+
+Dialog.create("Filetype")
+Dialog.addString("select filetype", " "); //set cSMAC channel
+Dialog.show();
+filetype = Dialog.getString();
+
+// Array.reverse(files);
+
+// Select a reference file to denote the channel names. The 
+// BF channel must be called BF, while the other channels 
+// have no restrictions
+
+for (i = 0; i < files.length; i++) {
+	if (endsWith(files[i], filetype)) {
+	ch_file = folder + files[i];
+	}
+}
+
+run("Bio-Formats Importer", "open=[ch_file]");
 
 nC = nSlices();
 print(nC);
@@ -44,6 +64,7 @@ for (c=0; c < nC; c++) {
 Dialog.show();
 
 close();
+run("Close All");
 
 for (c=0; c < nC; c++) {
 	Channels[c] = Dialog.getString();
@@ -51,26 +72,23 @@ for (c=0; c < nC; c++) {
 
 Array.print(Channels);
 
-// Select raw data file type
-Dialog.create("Filetype")
-Dialog.addString("Filetype", " ");
-Dialog.show();
-Filetype = Dialog.getString();
-
-// Select mask channel
-Dialog.create("Mask Channel")
-Dialog.addString("Mask Channel", " ");
-Dialog.show();
-maskCh = Dialog.getString();
-
 sortCh(dir);
 
 function sortCh(dir) {
-	for (i = 0; i < list.length; i++) {
-		if (endsWith(list[i], "." + Filetype)) {
-			file = dir+list[i];
+	for (sf=0; sf < subfolders.length; sf++) {
+		subfolder = dir+subfolders[sf];
+		datafiles = getFileList(subfolder);
+		Array.print(datafiles);
+		resFolder = dirOut + File.separator + "res_" + subfolders[sf];
+		print(resFolder); 
+		File.makeDirectory(resFolder);
+		Name = File.getName(resFolder);
+		print(Name); 
+		for (i = 0; i < datafiles.length; i++) {
+			if (endsWith(datafiles[i], filetype)) {
+			file = subfolder + datafiles[i];
 			run("Bio-Formats Importer", "open=[file]");
-			Img = dirOut + File.separator + list[i]; 
+			Img = resFolder + File.separator + datafiles[i]; 
 			print(Img); 
 			File.makeDirectory(Img);
 			run("Split Channels");
@@ -79,14 +97,24 @@ function sortCh(dir) {
 				selectWindow(ImgArray[s]);
 				rename(Channels[s]); 
 				}
-			selectWindow(maskCh);
-			saveAs("Tiff", Img + File.separator + maskCh);
-			run("Subtract Background...", "rolling=100 light");
-			run("Enhance Contrast...", "saturated=0.3 normalize");
-			run("Add...", "value=5000");
-			run("Make Binary");
+			selectWindow("BF");
+			run("Duplicate...", " ");
+			saveAs("Tiff", Img + File.separator + "BF");
+			close;
+
+			run("Subtract Background...", "rolling=50");
+			run("Enhance Contrast...", "saturated=2");
+			run("Despeckle");
+			run("Despeckle");
+			run("Despeckle");
+			run("Remove Outliers...", "radius=2 threshold=20 which=Bright");
+			run("Find Edges");
+			run("Gaussian Blur...", "sigma=10");
+			run("Enhance Contrast...", "saturated=0.1");
+			run("Convert to Mask");
 			run("Fill Holes");
-			run("Analyze Particles...", "size=7-Infinity exclude add");
+			run("Watershed");
+			run("Analyze Particles...", "size=50-Infinity add");
 			saveAs("Tiff", Img + File.separator + "masks");
 			close;
 			n = nImages;
@@ -95,13 +123,21 @@ function sortCh(dir) {
 				run("Subtract Background...", "rolling=50");
 				ImgName = getTitle();
 				saveAs("Tiff", Img + File.separator + ImgName);
+				if (roiManager("count") > 0){
 				roiManager("measure");
+				}
 				close;
 			}
+			if (roiManager("count") > 0){
 			roiManager("deselect");
 			roiManager("delete");
+			}
 		}
 	}
+	
 	selectWindow("Results");
-	saveAs("Results.txt", dirOut + File.separator + "ResultsAll");
+	saveAs("text", resFolder + File.separator + Name);
+	
+	run("Close");
+}
 }
